@@ -18,7 +18,7 @@ class DevOptionGUI:
     def generateComponent(self):
         box = Gtk.HBox()
         label = Gtk.Label(self.labelText, halign=Gtk.Align.START)
-        box.pack_start(label, True, True, 6)
+        box.pack_start(label, True, True, 0)
         comp = False
         state = None
         #choose type
@@ -61,7 +61,7 @@ class DevOptionGUI:
         else:
             raise Exception("DevOptionGUI: no such input type: %s" % self.optionType)
 
-        box.pack_start(comp, False, False, 6)
+        box.pack_start(comp, False, False, 0)
 
         return box, state
 
@@ -70,29 +70,24 @@ class DevOptionGUI:
 
 #Group of DevOptionGUI's (handle's initing, grouping components, and loading/saving)
 class DevOptionGUIGroup:
-    #options is an array of dictionaries of the form {"label":string, "type":string, "callback":func,}
+    #options is an array of DevOptionGUI's
     def __init__(self, options):
-        self.options = options
-        self.widgets = self.fromDict(options)
-        self.component = self.generateComponent()
+        self.widgets = []
+        self.generateComponent()
 
-    def fromDict(self, options):
-        widgets = []
-        for opt in self.options:
-            widgets.append(DevOptionGUI(opt["label"], opt["type"], opt["callback"]))
-
-        return widgets
+        for opt in options:
+            self.addOption(opt)
 
     def generateComponent(self):
-        box = Gtk.VBox()
+        self.box = Gtk.VBox()
 
-        for wid in self.widgets:
-            box.pack_start(wid.getComponent(), False, False, 6)
-
-        return box
+    def addOption(self, option):
+        self.widgets.append(option)
+        self.box.pack_start(option.getComponent(), False, False, 0)
+        self.box.show_all()
 
     def getComponent(self):
-        return self.component
+        return self.box
 
     #get state of option with given label
     def getStateByLabel(self, label):

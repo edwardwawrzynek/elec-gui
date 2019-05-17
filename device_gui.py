@@ -7,7 +7,7 @@ from dev_gui_option import DevOptionGUIGroup
 
 class DeviceGUI:
     #data is arbitrary data (probably port info, etc) passed during construction
-    def __init___(self, data):
+    def __init__(self, data):
         #dev name
         self.name = ""
         #channels (need to be added by subclass)
@@ -15,10 +15,38 @@ class DeviceGUI:
         #options (device wide)
         self.options = DevOptionGUIGroup([])
 
-    #return a component with the dev options, and channel options
+        self.generateComponent()
+
+    #set name
+    def setName(self, name):
+        self.name = name
+
+    #add option
+    def addOption(self, option):
+        self.options.addOption(option)
+
+    #create the initial component structure
     def generateComponent(self):
-        box = Gtk.HBox()
-        box.pack_start()
+        self.vbox = Gtk.VBox()
+        #TODO: VBox with channel switcher, HBox withs scrolled window of dev options on left, channel options on right
+
+        self.chan_stack = Gtk.Stack()
+        self.chan_switch = Gtk.StackSwitcher()
+        self.chan_switch.set_stack(self.chan_stack)
+
+        self.vbox.pack_start(self.options.getComponent(), True, True, 0)
+        self.vbox.pack_start(self.chan_switch, False, False, 0)
+        self.vbox.pack_start(self.chan_stack, True, True, 0)
+
+    def addChannel(self, chan):
+        self.channels.append(chan)
+        scroll = Gtk.ScrolledWindow()
+        scroll.add_with_viewport(chan.options.getComponent())
+        self.chan_stack.add_titled(scroll, chan.name, chan.name)
+        self.chan_stack.show_all()
+
+    def getComponent(self):
+        return self.vbox
 
 class ChannelGUI:
     #data is arbitrary data passed to channel by dev
@@ -27,3 +55,9 @@ class ChannelGUI:
         self.name = ""
         #options (channel specific)
         self.options = DevOptionGUIGroup([])
+
+    def setName(self, name):
+        self.name = name
+
+    def addOption(self, option):
+        self.options.addOption(option)

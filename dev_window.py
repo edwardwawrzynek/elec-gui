@@ -13,12 +13,12 @@ class DeviceWindow:
         self.dev_switcher.set_stack(self.dev_stack)
 
         self.component = Gtk.VBox()
-        self.component.pack_start(self.dev_switcher, False, False, 6)
-        self.component.pack_start(self.dev_stack, False, False, 6)
+        self.component.pack_start(self.dev_switcher, False, False, 0)
+        self.component.pack_start(self.dev_stack, True, True, 0)
 
     def addDev(self, dev):
         self.devs.append(dev)
-        self.dev_stack.add_titled(dev.options.getComponent(), dev.name, dev.name)
+        self.dev_stack.add_titled(dev.getComponent(), dev.name, dev.name)
 
     def getComponent(self):
         return self.component

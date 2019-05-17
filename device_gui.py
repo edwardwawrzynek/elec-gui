@@ -40,9 +40,7 @@ class DeviceGUI:
 
     def addChannel(self, chan):
         self.channels.append(chan)
-        scroll = Gtk.ScrolledWindow()
-        scroll.add_with_viewport(chan.options.getComponent())
-        self.chan_stack.add_titled(scroll, chan.name, chan.name)
+        self.chan_stack.add_titled(chan.options.getComponent(), chan.name, chan.name)
         self.chan_stack.show_all()
 
     def getComponent(self):

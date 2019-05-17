@@ -4,7 +4,7 @@ from test_dev import *
 
 def main():
     dev = DeviceWindow()
-    #dev.addDev(TestDev("Test Dev 1"))
+    dev.addDev(TestDev("Test Dev 1"))
     dev.addDev(TestDev("Test Dev 2"))
 
 

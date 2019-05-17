@@ -58,6 +58,17 @@ class DevOptionGUI:
 
             comp.connect("activate", float_entry_activate, self.callback)
 
+        elif self.optionType == "button":
+            comp = Gtk.Button(self.label)
+            state = False
+
+            def button_entry_activate(widget, callback):
+                self.state = True
+                callback(state)
+                self.state = False
+
+            comp.connect("clicked", button_entry_activate, self.callback)
+
         else:
             raise Exception("DevOptionGUI: no such input type: %s" % self.optionType)
 

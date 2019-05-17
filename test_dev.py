@@ -21,6 +21,9 @@ class TestDev(DeviceGUI):
         self.setName(data)
 
         self.addOption(DevOptionGUI("num chans", "float", self.setChans))
+        self.addOption(DevOptionGUI("trigger", "button", lambda x:
+            self.addOption(DevOptionGUI("additional button", "button", lambda x:print("hi")))
+        ))
 
     def setChans(self, numChans):
         for i in range(int(numChans)):

@@ -73,7 +73,6 @@ class DevOptionGUI:
             raise Exception("DevOptionGUI: no such input type: %s" % self.optionType)
 
         box.pack_start(comp, False, False, 0)
-
         return box, state
 
     def getComponent(self):

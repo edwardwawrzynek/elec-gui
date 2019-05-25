@@ -1,6 +1,9 @@
 from device_gui import *
 from dev_window import *
 from test_dev import *
+from graph import *
+
+
 
 def main():
     dev = DeviceWindow()
@@ -13,7 +16,9 @@ def main():
     win.set_default_size(400, 300)
     win.set_title("Electronics GUI")
 
-    win.add(dev.getComponent())
+    a = Graph(None)
+
+    win.add(a.getComponent())
     win.show_all()
     Gtk.main()
 

@@ -3,25 +3,28 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 
 from dev_gui_option import DevOptionGUIGroup, DevOptionGUI
-from devices import devices
+from dev_window import devices
 
 from matplotlib.backends.backend_gtk3agg import (
     FigureCanvasGTK3Agg as FigureCanvas)
+from matplotlib.backends.backend_gtk3 import (
+    NavigationToolbar2GTK3 as NavigationToolbar)
 from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
 import numpy as np
 
-#Channel Selection (callback when channel changes)
+#Channel Selection (callback is called when channel changes)
 def ChannelChooser(callback):
     box = Gtk.VBox()
     dev_list = Gtk.ComboBoxText()
     chan_list = Gtk.ComboBoxText()
-    for dev in devices:
+    for dev in devices.getDevs():
         dev_list.append_text(dev.name)
     
     #when a device is chosen, we need to set the channel options
     def dev_selected(_):
         chan_list.remove_all()
-        dev = [d for d in devices if d.name == dev_list.get_active_text()]
+        dev = [d for d in devices.getDevs() if d.name == dev_list.get_active_text()]
         if not dev:
             return
         dev = dev[0]
@@ -30,7 +33,7 @@ def ChannelChooser(callback):
         
     #when a channel is selected, we need to trigger callback
     def chan_selected(_):
-        dev = [d for d in devices if d.name == dev_list.get_active_text()]
+        dev = [d for d in devices.getDevs() if d.name == dev_list.get_active_text()]
         if not dev:
             return
         dev = dev[0]
@@ -72,7 +75,7 @@ class Output:
         self.options.addOption(option)
     
     #creates the component specific to this output type
-    #called on every addition of input source (it should use a local variable as the component and adjust it)
+    #called on every addition of input source
     #override this
     def generateOutput(self):
         #TODO: call different method for changes?
@@ -141,7 +144,6 @@ class Output:
         self.output_box.show_all()
     
     #called on input trigger (probably redraw needed) -- override
-    #TODO: get input directly from channels (no need to do duplicate load on channels in multiple outputs)
     def inputAvailable(self):
         pass
 
@@ -150,14 +152,32 @@ class Graph(Output):
     def __init__(self, data):
         super().__init__(data)
 
-        self.addOption(DevOptionGUI("Test Param", "string", lambda x:x))
+        self.addOption(DevOptionGUI("x-axis label", "string", lambda x:x))
+        self.addOption(DevOptionGUI("y-axis label", "string", lambda x:x))
     
     def generateOutput(self):
-        f = Figure(figsize=(5, 4), dpi=100)
-        a = f.add_subplot(111)
-        t = np.arange(0.0, 3.0, 0.01)
-        s = np.sin(2*np.pi*t)
-        a.plot(t, s)
-        canvas = FigureCanvas(f)
-        canvas.set_size_request(800, 600)
-        return canvas
+        self.graph_vbox = Gtk.VBox()
+        self.fig = Figure(figsize=(5, 4), dpi=100)
+        self.subplot = self.fig.add_subplot(1, 1, 1)
+        self.canvas = FigureCanvas(self.fig)
+        self.canvas.set_size_request(600, 400)
+        self.toolbar = NavigationToolbar(self.canvas, self.graph_vbox)
+        self.graph_vbox.pack_start(self.canvas, True, True, 0)
+        self.graph_vbox.pack_start(self.toolbar, False, False, 0)
+
+        return self.graph_vbox
+    
+    def inputAvailable(self):
+        self.subplot.clear()
+        xLabel = self.options.getStateByLabel("x-axis label")
+        yLabel = self.options.getStateByLabel("y-axis label")
+        self.subplot.set_xlabel(xLabel)
+        self.subplot.set_ylabel(yLabel)
+        self.subplot.grid(True)
+        for src in self.sources:
+            xData = src.getData().sel(x=xLabel).data
+            yData = src.getData().sel(x=yLabel).data
+
+            self.subplot.plot(xData, yData, label="hi")
+            self.canvas.draw()
+            self.output_box.show_all()

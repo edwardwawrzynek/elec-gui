@@ -31,6 +31,7 @@ class DevOptionGUI:
                 callback(self.state)
 
             comp.connect("activate", string_entry_activate, self.callback)
+            comp.connect("focus-out-event", lambda w, _, c: string_entry_activate(w, c), self.callback)
 
         elif self.optionType == "bool":
             comp = Gtk.CheckButton()
@@ -57,6 +58,7 @@ class DevOptionGUI:
                     widget.set_text("")
 
             comp.connect("activate", float_entry_activate, self.callback)
+            comp.connect("focus-out-event", lambda w, _, c: float_entry_activate(w, c), self.callback)
 
         elif self.optionType == "button":
             comp = Gtk.Button(self.label)

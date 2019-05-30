@@ -64,13 +64,15 @@ class DeviceGUI:
 
 class ChannelGUI:
     #data is arbitrary data passed to channel by dev
-    def __init__(self, data):
+    def __init__(self, dev, data):
         #name of channel
         self.name = ""
         #options (channel specific)
         self.options = DevOptionGUIGroup([])
         #most recent data collection
         self.data = xarray.DataArray([[]], dims=('x', 'y'))
+        #device that owns the channel
+        self.parent = dev
 
     def setName(self, name):
         self.name = name

@@ -19,32 +19,33 @@ class DevOptionGUI:
         box = Gtk.HBox()
         label = Gtk.Label(self.labelText, halign=Gtk.Align.START)
         box.pack_start(label, True, True, 0)
-        comp = False
+        self.comp = False
         state = None
         #choose type
         if self.optionType == "string":
-            comp = Gtk.Entry()
+            self.comp = Gtk.Entry()
             state = ""
 
             def string_entry_activate(widget, callback):
                 self.state = widget.get_text()
                 callback(self.state)
 
-            comp.connect("activate", string_entry_activate, self.callback)
-            comp.connect("focus-out-event", lambda w, _, c: string_entry_activate(w, c), self.callback)
+            self.comp.connect("activate", string_entry_activate, self.callback)
+            self.comp.connect("focus-out-event", lambda w, _, c: string_entry_activate(w, c), self.callback)
 
         elif self.optionType == "bool":
-            comp = Gtk.CheckButton()
+            self.comp = Gtk.CheckButton()
             state = False
 
             def bool_entry_toggle(widget, callback):
                 self.state = widget.get_active()
                 callback(self.state)
 
-            comp.connect("toggled",bool_entry_toggle, self.callback)
+            self.comp.connect("toggled",bool_entry_toggle, self.callback)
 
         elif self.optionType == "float":
-            comp = Gtk.Entry()
+            self.comp = Gtk.Entry()
+            self.comp.set_text("0.0")
             state = 0.0
 
             def float_entry_activate(widget, callback):
@@ -55,13 +56,13 @@ class DevOptionGUI:
                     self.state = float(text)
                     callback(self.state)
                 else:
-                    widget.set_text("")
+                    widget.set_text(str(self.state))
 
-            comp.connect("activate", float_entry_activate, self.callback)
-            comp.connect("focus-out-event", lambda w, _, c: float_entry_activate(w, c), self.callback)
+            self.comp.connect("activate", float_entry_activate, self.callback)
+            self.comp.connect("focus-out-event", lambda w, _, c: float_entry_activate(w, c), self.callback)
 
         elif self.optionType == "button":
-            comp = Gtk.Button(self.label)
+            self.comp = Gtk.Button(self.label)
             state = False
 
             def button_entry_activate(widget, callback):
@@ -69,16 +70,19 @@ class DevOptionGUI:
                 callback(state)
                 self.state = False
 
-            comp.connect("clicked", button_entry_activate, self.callback)
+            self.comp.connect("clicked", button_entry_activate, self.callback)
 
         else:
             raise Exception("DevOptionGUI: no such input type: %s" % self.optionType)
 
-        box.pack_start(comp, False, False, 0)
+        box.pack_start(self.comp, False, False, 0)
         return box, state
 
     def getComponent(self):
         return self.component
+    
+    def getUnlabeledComponent(self):
+        return self.comp
 
 #Group of DevOptionGUI's (handle's initing, grouping components, and loading/saving)
 class DevOptionGUIGroup:
@@ -95,7 +99,7 @@ class DevOptionGUIGroup:
 
     def addOption(self, option):
         self.widgets.append(option)
-        self.box.pack_start(option.getComponent(), False, False, 0)
+        self.box.pack_start(option.getComponent(), False, False, 2)
         self.box.show_all()
 
     def getComponent(self):

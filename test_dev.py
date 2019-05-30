@@ -9,8 +9,8 @@ import numpy as np
 import xarray
 
 class TestChannel(ChannelGUI):
-    def __init__(self, data):
-        super().__init__(data)
+    def __init__(self, dev, data):
+        super().__init__(dev, data)
 
         self.setName(data)
         self.addOption(DevOptionGUI("max", "float", lambda x:x))
@@ -18,8 +18,7 @@ class TestChannel(ChannelGUI):
     
     def collectData(self):
         #return random data
-        return xarray.DataArray(np.random.randn(3,200), coords={'x':['time', 'volts', 'frequency']}, dims=('x', 'y'))
-
+        return xarray.DataArray(np.array([np.arange(0.0, 10.0, 0.1), np.random.rand(100), np.random.rand(100)]), coords={'x':['time', 'volts', 'frequency']}, dims=('x', 'y'))
 
 
 class TestDev(DeviceGUI):
@@ -28,12 +27,10 @@ class TestDev(DeviceGUI):
 
         self.setName(data)
 
-        self.addOption(DevOptionGUI("num chans", "float", self.setChans))
-        self.addOption(DevOptionGUI("trigger", "button", lambda x:
-            self.addOption(DevOptionGUI("additional button", "button", lambda x:print("hi")))
-        ))
-        self.setChans(1)
-
-    def setChans(self, numChans):
-        for i in range(int(numChans)):
-            self.addChannel(TestChannel("channel %i" % i))
+        self.addOption(DevOptionGUI("random device option", "string", lambda x:x))
+        self.addOption(DevOptionGUI("random float", "float", lambda x:x))
+        self.addOption(DevOptionGUI("random bool option", "bool", lambda x:x))
+        self.addOption(DevOptionGUI("random button", "button", lambda x:x))
+        #Add ten channels
+        for i in range(10):
+            self.addChannel(TestChannel(self, "channel %i" % i))

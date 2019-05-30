@@ -1,6 +1,7 @@
 import re, gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
+from gi.repository import Gdk
 
 from dev_gui_option import DevOptionGUIGroup, DevOptionGUI
 from dev_window import devices
@@ -62,11 +63,14 @@ def ChannelChooser(callback):
 
 #Generic data output class (graph, raw values, data analyzer, etc)
 class Output:
-    def __init__(self, data):
+    def __init__(self, name, remove_callback):
         #custom options for output type
         self.options = DevOptionGUIGroup([])
         #channels to draw data from
         self.sources = []
+        #output name
+        self.name = name
+        self.remove_callback = remove_callback
         #create component
         self.generateComponent()
     
@@ -78,7 +82,6 @@ class Output:
     #called on every addition of input source
     #override this
     def generateOutput(self):
-        #TODO: call different method for changes?
         return Gtk.Label("Sample Output. Sources: " + str(len(self.sources)))
 
     def newSourceWindow(self, _):
@@ -101,13 +104,20 @@ class Output:
         self.addSource(chan)
 
     def generateComponent(self):
-        #TODO: vbox with graph/whatever at top, then add source button, then type specific options
+        #vbox with graph/whatever at top, then add source button, then type specific options
         self.output_box = Gtk.VBox()
-        #TODO: add overridden component
+        #add title and removal button
+        titleBox = Gtk.HBox()
+        titleBox.pack_start(Gtk.Label(self.name), True, True, 0)
+        removeButton = Gtk.Button("Remove Output")
+        removeButton.connect("clicked", lambda _, data: self.remove_callback(data), self)
+        titleBox.pack_start(removeButton, False, False, 0)
+        self.output_box.pack_start(titleBox, False, False, 0)
+        #add overridden component
         self.output_box.pack_start(self.generateOutput(), False, False, 0)
 
         #Add option to add new source
-        new_source_button = Gtk.Button("New Data Source")
+        new_source_button = Gtk.Button("Add Data Source")
         new_source_button.connect("clicked", self.newSourceWindow)
         self.output_box.pack_start(new_source_button, False, False, 0)
         self.output_box.pack_start(self.options.getComponent(), False, False, 0)
@@ -136,11 +146,14 @@ class Output:
             return
 
         self.sources.append(source)
+        self.regenateOutput()
+    
+    def regenateOutput(self):
         #regenerate output component
-        self.output_box.remove(self.output_box.get_children()[0])
+        self.output_box.remove(self.output_box.get_children()[1])
         new_out = self.generateOutput()
         self.output_box.pack_start(new_out, False, False, 0)
-        self.output_box.reorder_child(new_out, 0)
+        self.output_box.reorder_child(new_out, 1)
         self.output_box.show_all()
     
     #called on input trigger (probably redraw needed) -- override
@@ -149,11 +162,13 @@ class Output:
 
 #A display for data output
 class Graph(Output):
-    def __init__(self, data):
-        super().__init__(data)
+    def __init__(self, name, remove_callback):
+        super().__init__(name, remove_callback)
+        self.sourceColors = []
 
-        self.addOption(DevOptionGUI("x-axis label", "string", lambda x:x))
-        self.addOption(DevOptionGUI("y-axis label", "string", lambda x:x))
+        self.addOption(DevOptionGUI("x-axis label", "string", self.updateXLabel))
+        self.addOption(DevOptionGUI("y-axis label", "string", self.updateYLabel))
+    
     
     def generateOutput(self):
         self.graph_vbox = Gtk.VBox()
@@ -164,20 +179,90 @@ class Graph(Output):
         self.toolbar = NavigationToolbar(self.canvas, self.graph_vbox)
         self.graph_vbox.pack_start(self.canvas, True, True, 0)
         self.graph_vbox.pack_start(self.toolbar, False, False, 0)
+        self.graph_vbox.pack_start(Gtk.Label("Data Sources:"), False, False, 6)
+        self.graph_vbox.pack_start(self.generateSourcesComponent(), False, False, 0)
+
+        self.inputAvailable()
 
         return self.graph_vbox
     
+    #generate a list of all the channels currently in use, as well as options for each
+    def generateSourcesComponent(self):
+        grid = Gtk.Grid()
+        grid.attach(Gtk.Label("Source Name"), 0, 0, 1, 1)
+        grid.attach(Gtk.Label("Color"), 1, 0, 1, 1)
+        
+        i = 1
+        for src in self.sources:
+            grid.attach(Gtk.HSeparator(), 0, i, 2, 1)
+            i+=1
+            grid.attach(Gtk.Label(src.name), 0, i, 1, 1)
+
+            colorButton = Gtk.ColorButton()
+            color = None
+            if len(self.sourceColors) <= int((i/2)-1):
+                color = Gdk.RGBA(np.random.random_sample(), np.random.random_sample(), np.random.random_sample())
+                self.sourceColors.append([color.red, color.green, color.blue])
+            else:
+                colorList = self.sourceColors[int((i/2)-1)]
+                color = Gdk.RGBA(colorList[0], colorList[1], colorList[2])
+            colorButton.set_rgba(color)
+
+            colorButton.connect("color-set", self.setSourceColor, int((i/2)-1))
+
+            grid.attach(colorButton, 1, i, 1, 1)
+
+            removeButton = Gtk.Button("Remove Source")
+            removeButton.connect("clicked", self.removeSource, int((i/2)-1))
+            grid.attach(removeButton, 2, i, 1, 1)
+            i+=1
+        return grid
+    
+    def setSourceColor(self, widget, index):
+        color = widget.get_rgba()
+        self.sourceColors[index] = [color.red, color.green, color.blue]
+        self.inputAvailable()
+    
+    def removeSource(self, widget, index):
+        self.sources.pop(index)
+        self.sourceColors.pop(index)
+        self.regenateOutput()
+
     def inputAvailable(self):
-        self.subplot.clear()
         xLabel = self.options.getStateByLabel("x-axis label")
         yLabel = self.options.getStateByLabel("y-axis label")
+        self.graphInput(xLabel, yLabel)
+        
+    def updateXLabel(self, label):
+        xLabel = label
+        yLabel = self.options.getStateByLabel("y-axis label")
+        self.graphInput(xLabel, yLabel)
+    
+    def updateYLabel(self, label):
+        yLabel = label
+        xLabel = self.options.getStateByLabel("x-axis label")
+        self.graphInput(xLabel, yLabel)
+
+    def graphInput(self, xLabel, yLabel):
+        self.subplot.clear()
         self.subplot.set_xlabel(xLabel)
         self.subplot.set_ylabel(yLabel)
         self.subplot.grid(True)
+        i=0
         for src in self.sources:
-            xData = src.getData().sel(x=xLabel).data
-            yData = src.getData().sel(x=yLabel).data
-
-            self.subplot.plot(xData, yData, label="hi")
+            xData = None
+            yData = None
+            try:
+                xData = src.getData().sel(x=xLabel).data
+                yData = src.getData().sel(x=yLabel).data
+            except:
+                #the specified labels aren't present in the data
+                #TODO: warning?
+                i+=1
+                continue
+            self.subplot.plot(xData, yData, color=self.sourceColors[i])
             self.canvas.draw()
             self.output_box.show_all()
+            i+=1
+
+    

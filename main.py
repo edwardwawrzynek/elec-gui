@@ -7,8 +7,7 @@ from devices import *
 def main():
     app = AppWindow(
         devices_list,
-        [Graph(None),
-         Graph(None)]
+        []
     )
 
 

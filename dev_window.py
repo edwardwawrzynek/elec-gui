@@ -4,6 +4,7 @@ from gi.repository import Gtk
 
 from device_gui import DeviceGUI, ChannelGUI, DevOptionGUIGroup
 from devices import devices
+from graph import Graph
 
 #The window showing the device subsytems (device selection, options, channel selection, options)
 class DeviceWindow:
@@ -50,17 +51,75 @@ class DeviceWindow:
 #outputs pane
 class OutputWindow:
     def __init__(self):
+        self.outputTypes = [Graph]
         self.outputs = []
+        #contains outputs
         self.outputBox = Gtk.VBox()
+        #contains self.outputsBox and add output box
+        self.vbox = Gtk.VBox()
+        self.vbox.pack_start(self.outputBox, False, False, 0)
+        addOutputButton = Gtk.Button("Add New Output")
+        addOutputButton.connect("clicked", lambda _: self.newOutput())
+        self.vbox.pack_start(addOutputButton, False, False, 0)
         self.window = Gtk.ScrolledWindow()
         self.window.set_propagate_natural_width(True)
-        self.window.add_with_viewport(self.outputBox)
+        self.window.add_with_viewport(self.vbox)
     
+    #make popup for new output
+    def newOutput(self):
+        popup = Gtk.Dialog()
+        popup.add_buttons("Add", 1, "Cancel", 2)
+
+        grid = Gtk.Grid()
+        grid.attach(Gtk.Label("New Output:"), 0, 0, 2, 1)
+
+        grid.attach(Gtk.Label("Output Type:"), 0, 1, 1, 1)
+        outputChooser = Gtk.ComboBoxText()
+        i = 0
+        for outType in self.outputTypes:
+            outputChooser.append(str(i), outType.__name__)
+            i+=1
+        grid.attach(outputChooser, 1, 1, 1, 1)
+
+        titleEntry = Gtk.Entry()
+        titleEntry.set_text("Untitled")
+        grid.attach(Gtk.Label("Output Name:"), 0, 2, 1, 1)
+        grid.attach(titleEntry, 1, 2, 1, 1)
+
+        popup.vbox.pack_start(grid, False, False, 0)
+
+        popup.show_all()
+
+        if popup.run() == 1:
+            index = outputChooser.get_active()
+            if index == -1:
+                error_popup = Gtk.Dialog()
+                error_popup.add_buttons("Ok", 1)
+                error_popup.vbox.pack_start(Gtk.Label("An output type was not selected"), False, False, 0)
+                error_popup.show_all()
+                error_popup.run()
+                error_popup.destroy()
+                popup.destroy()
+                return self.newOutput()
+            
+            outType = self.outputTypes[index]
+            self.addOutput(outType(titleEntry.get_text(), self.removeOutput))
+        
+        popup.destroy()
+
     def addOutput(self, output):
         self.outputs.append(output)
         self.outputBox.pack_start(output.getComponent(), False, False, 6)
         self.outputBox.pack_start(Gtk.VSeparator(), False, False, 6)
         self.outputBox.show_all()
+    
+    #callback passed to output to call when remove button is pressed
+    def removeOutput(self, output):
+        self.outputs.remove(output)
+        children = self.outputBox.get_children()
+        index = children.index(output.getComponent())
+        self.outputBox.remove(children[index])
+        self.outputBox.remove(children[index+1])
     
     def getComponent(self):
         return self.window

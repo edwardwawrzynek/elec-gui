@@ -166,8 +166,8 @@ class Graph(Output):
         super().__init__(name, remove_callback)
         self.sourceColors = []
 
-        self.addOption(DevOptionGUI("x-axis label", "string", self.updateXLabel))
-        self.addOption(DevOptionGUI("y-axis label", "string", self.updateYLabel))
+        self.addOption(DevOptionGUI("x-axis label", "string", self.updateXLabel, default="time"))
+        self.addOption(DevOptionGUI("y-axis label", "string", self.updateYLabel, default="volts"))
     
     
     def generateOutput(self):
@@ -196,7 +196,7 @@ class Graph(Output):
         for src in self.sources:
             grid.attach(Gtk.HSeparator(), 0, i, 2, 1)
             i+=1
-            grid.attach(Gtk.Label(src.name), 0, i, 1, 1)
+            grid.attach(Gtk.Label(src.parent.name + ": " + src.name), 0, i, 1, 1)
 
             colorButton = Gtk.ColorButton()
             color = None

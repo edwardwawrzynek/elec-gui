@@ -13,13 +13,17 @@ class TestChannel(ChannelGUI):
         super().__init__(dev, data)
 
         self.setName(data)
-        self.addOption(DevOptionGUI("max", "float", lambda x:x))
-        self.addOption(DevOptionGUI("min", "float", lambda x:x))
+        self.addOption(DevOptionGUI("max", "float", lambda x:x, default=1.0))
+        self.addOption(DevOptionGUI("min", "float", lambda x:x, default=0.0))
     
     def collectData(self):
         #return random data
-        return xarray.DataArray(np.array([np.arange(0.0, 10.0, 0.1), np.random.rand(100), np.random.rand(100)]), coords={'x':['time', 'volts', 'frequency']}, dims=('x', 'y'))
+        maxV = self.options.getStateByLabel("max")
+        minV = self.options.getStateByLabel("min")
+        return xarray.DataArray(np.array([np.arange(0.0, 10.0, 0.1), minV+np.random.rand(100)*(maxV-minV), minV+np.random.rand(100)*(maxV-minV)]), coords={'x':['time', 'volts', 'frequency']}, dims=('x', 'y'))
 
+    def getDataLabels(self):
+        return ['time', 'volts', 'frequency']
 
 class TestDev(DeviceGUI):
     def __init__(self, data):

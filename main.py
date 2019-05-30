@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from device_gui import *
 from dev_window import *
 from test_dev import *

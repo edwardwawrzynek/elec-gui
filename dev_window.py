@@ -154,6 +154,7 @@ class AppWindow:
         self.trigW = TriggersWindow(self.devW.devs, self.outW.outputs)
         
         self.box = Gtk.Paned.new(Gtk.Orientation.HORIZONTAL)
+        self.box.set_position(400)
         self.dev_vbox = Gtk.VBox()
         self.dev_vbox.pack_start(self.devW.getComponent(), True, True, 0)
         self.dev_vbox.pack_start(self.trigW.getComponent(), False, False, 0)

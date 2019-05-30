@@ -7,11 +7,12 @@ class DevOptionGUI:
     #label is the name of the option
     #optionType is one of "string", "bool", "float", (TODO: channel, int, file, etc)
     #callback is the function to call when the value changes
-    def __init__(self, label, optionType, callback):
+    def __init__(self, label, optionType, callback, default=None):
         self.label = label
         self.labelText = "%s (%s)" % (label, optionType)
         self.optionType = optionType
         self.callback = callback
+        self.default = default
         #generate widget and initial state based on type
         self.component, self.state = self.generateComponent()
 
@@ -21,10 +22,14 @@ class DevOptionGUI:
         box.pack_start(label, True, True, 0)
         self.comp = False
         state = None
+        if self.default != None:
+            state = self.default
         #choose type
         if self.optionType == "string":
             self.comp = Gtk.Entry()
-            state = ""
+            if state == None:
+                state = ""
+            self.comp.set_text(state)
 
             def string_entry_activate(widget, callback):
                 self.state = widget.get_text()
@@ -35,7 +40,8 @@ class DevOptionGUI:
 
         elif self.optionType == "bool":
             self.comp = Gtk.CheckButton()
-            state = False
+            if state == None:
+                state = False
 
             def bool_entry_toggle(widget, callback):
                 self.state = widget.get_active()
@@ -45,8 +51,9 @@ class DevOptionGUI:
 
         elif self.optionType == "float":
             self.comp = Gtk.Entry()
-            self.comp.set_text("0.0")
-            state = 0.0
+            if state == None:
+                state = 0.0
+            self.comp.set_text(str(state))
 
             def float_entry_activate(widget, callback):
                 text = widget.get_text()
@@ -63,7 +70,8 @@ class DevOptionGUI:
 
         elif self.optionType == "button":
             self.comp = Gtk.Button(self.label)
-            state = False
+            if state == None:
+                state = False
 
             def button_entry_activate(widget, callback):
                 self.state = True

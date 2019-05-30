@@ -32,7 +32,6 @@ class DeviceGUI:
     #create the initial component structure
     def generateComponent(self):
         self.vbox = Gtk.VBox()
-        #TODO: VBox with channel switcher, HBox withs scrolled window of dev options on left, channel options on right
 
         self.chan_stack = Gtk.Stack()
         self.chan_switch = Gtk.StackSwitcher()
@@ -46,7 +45,10 @@ class DeviceGUI:
 
     def addChannel(self, chan):
         self.channels.append(chan)
-        self.chan_stack.add_titled(chan.options.getComponent(), chan.name, chan.name)
+        vbox = Gtk.VBox()
+        vbox.pack_start(Gtk.Label("Output labels: " + str(chan.getDataLabels()), halign=Gtk.Align.START), False, False, 0)
+        vbox.pack_start(chan.options.getComponent(), False, False, 0)
+        self.chan_stack.add_titled(vbox, chan.name, chan.name)
         self.chan_stack.show_all()
 
     def getComponent(self):
@@ -84,8 +86,11 @@ class ChannelGUI:
     #this will be run in a separate thread, so it should block until data is ready and then return it
     #it should return a 2-dimensional xarray with dimension labels x and y, and labeled x coordinates coresponding to the type of data (time, volts, etc)
     def collectData(self):
-        #return random data
-        return xarray.DataArray(np.random.randn(3,20), coords={'x':['time', 'volts', 'frequency']}, dims=('x', 'y'))
+        raise Exception("Devices need to override collectData")
+    
+    #return the labels that data will have (ovverride)
+    def getDataLabels(self):
+        raise Exception("Devices need to override getDataLabels")
 
     def triggerCollection(self):
         self.data = self.collectData()

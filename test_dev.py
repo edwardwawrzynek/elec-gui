@@ -33,8 +33,9 @@ class TestDev(DeviceGUI):
 
         self.addOption(DevOptionGUI("random device option", "string", lambda x:x))
         self.addOption(DevOptionGUI("random float", "float", lambda x:x))
-        self.addOption(DevOptionGUI("random bool option", "bool", lambda x:x))
+        self.addOption(DevOptionGUI("random bool option", "bool", lambda x:x, default=True))
         self.addOption(DevOptionGUI("random button", "button", lambda x:x))
+        self.addOption(DevOptionGUI("random int", "int", lambda x:x, default=-5))
         #Add ten channels
         for i in range(10):
             self.addChannel(TestChannel(self, "channel %i" % i))

@@ -42,10 +42,13 @@ class DevOptionGUI:
             self.comp = Gtk.CheckButton()
             if state == None:
                 state = False
+            
+            self.comp.set_active(state)
 
             def bool_entry_toggle(widget, callback):
                 self.state = widget.get_active()
                 callback(self.state)
+
 
             self.comp.connect("toggled",bool_entry_toggle, self.callback)
 
@@ -58,7 +61,7 @@ class DevOptionGUI:
             def float_entry_activate(widget, callback):
                 text = widget.get_text()
                 #make sure entry is a float, clear if not
-                match = re.match(r"(\d+(\.\d+)?)", text)
+                match = re.match(r"-?(\d+(\.\d+)?)", text)
                 if match != None and match.group(0) == text:
                     self.state = float(text)
                     callback(self.state)
@@ -67,6 +70,26 @@ class DevOptionGUI:
 
             self.comp.connect("activate", float_entry_activate, self.callback)
             self.comp.connect("focus-out-event", lambda w, _, c: float_entry_activate(w, c), self.callback)
+
+        elif self.optionType == "int":
+            self.comp = Gtk.Entry()
+            if state == None:
+                state = 0
+            self.comp.set_text(str(state))
+
+            def int_entry_activate(widget, callback):
+                text = widget.get_text()
+                #make sure enrty is int
+                match = re.match(r"-?\d*", text)
+                if match != None and match.group(0) == text:
+                    self.state = float(text)
+                    callback(self.state)
+                else:
+                    widget.set_text(str(self.state))
+            
+            self.comp.connect("activate", int_entry_activate, self.callback)
+            self.comp.connect("focus-out-event", lambda w, _, c: int_entry_activate(w, c), self.callback)
+
 
         elif self.optionType == "button":
             self.comp = Gtk.Button(self.label)

@@ -79,10 +79,10 @@ class DevOptionGUI:
 
             def int_entry_activate(widget, callback):
                 text = widget.get_text()
-                #make sure enrty is int
+                #make sure entry is int
                 match = re.match(r"-?\d*", text)
                 if match != None and match.group(0) == text:
-                    self.state = float(text)
+                    self.state = int(text)
                     callback(self.state)
                 else:
                     widget.set_text(str(self.state))

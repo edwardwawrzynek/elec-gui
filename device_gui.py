@@ -46,7 +46,7 @@ class DeviceGUI:
     def addChannel(self, chan):
         self.channels.append(chan)
         vbox = Gtk.VBox()
-        vbox.pack_start(Gtk.Label("Output labels: " + str(chan.getDataLabels()), halign=Gtk.Align.START), False, False, 0)
+        vbox.pack_start(Gtk.Label("X axis label: " + str(chan.getXAxisDim()), halign=Gtk.Align.START), False, False, 0)
         vbox.pack_start(chan.options.getComponent(), False, False, 0)
         self.chan_stack.add_titled(vbox, chan.name, chan.name)
         self.chan_stack.show_all()
@@ -62,6 +62,15 @@ class DeviceGUI:
         for chan in self.channels:
             #TODO: make this actually be called async
             chan.triggerCollection()
+    
+    #create a dialog for errors
+    def displayError(self, errMsg):
+        dialog = Gtk.Dialog()
+        dialog.add_buttons("Ok", 1)
+        dialog.vbox.pack_start(Gtk.Label("Device '%s' Raised an Error:\n%s" % (self.name, errMsg)), False, False, 0)
+        dialog.show_all()
+        dialog.run()
+        dialog.destroy()
     
 
 class ChannelGUI:
@@ -88,9 +97,9 @@ class ChannelGUI:
     def collectData(self):
         raise Exception("Devices need to override collectData")
     
-    #return the labels that data will have (ovverride)
-    def getDataLabels(self):
-        raise Exception("Devices need to override getDataLabels")
+    #return the x dimension label
+    def getXAxisDim(self):
+        raise Exception("Devices need to override getXAxisDim")
 
     def triggerCollection(self):
         self.data = self.collectData()
@@ -100,3 +109,12 @@ class ChannelGUI:
     def getData(self):
         #TODO: locking (for async), etc ?
         return self.data
+    
+    #create a dialog for errors
+    def displayError(self, errMsg):
+        dialog = Gtk.Dialog()
+        dialog.add_buttons("Ok", 1)
+        dialog.vbox.pack_start(Gtk.Label("Channel '%s' of Device '%s' Raised an Error:\n%s" % (self.name, self.parent.name, errMsg)), False, False, 0)
+        dialog.show_all()
+        dialog.run()
+        dialog.destroy()

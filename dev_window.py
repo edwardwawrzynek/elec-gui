@@ -160,6 +160,8 @@ class AppWindow:
         self.dev_vbox.pack_start(self.trigW.getComponent(), False, False, 0)
         self.box.add1(self.dev_vbox)
         self.box.add2(self.outW.getComponent())
+        self.box.get_child1().set_border_width(6)
+        self.box.get_child2().set_border_width(6)
         #dev and channel switcher
         self.vbox = Gtk.VBox()
         self.vbox.pack_start(self.devW.getSwitchComponent(), False, False, 0)

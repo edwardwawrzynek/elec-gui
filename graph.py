@@ -13,6 +13,8 @@ from matplotlib.backends.backend_gtk3 import (
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 import numpy as np
+import xarray as xr
+from astropy import units as u
 
 #Channel Selection (callback is called when channel changes)
 def ChannelChooser(callback):
@@ -109,9 +111,16 @@ class Output:
         #add title and removal button
         titleBox = Gtk.HBox()
         titleBox.pack_start(Gtk.Label(self.name), True, True, 0)
+        
+        triggerButton = Gtk.Button("Trigger Collection")
+        triggerButton.connect("clicked", lambda _: self.triggerCollectionSources())
+        titleBox.pack_start(triggerButton, False, False, 0)
+        
+
         removeButton = Gtk.Button("Remove Output")
         removeButton.connect("clicked", lambda _, data: self.remove_callback(data), self)
         titleBox.pack_start(removeButton, False, False, 0)
+
         self.output_box.pack_start(titleBox, False, False, 0)
         #add overridden component
         self.output_box.pack_start(self.generateOutput(), False, False, 0)
@@ -156,9 +165,25 @@ class Output:
         self.output_box.reorder_child(new_out, 1)
         self.output_box.show_all()
     
+    #collect data on all input sources
+    def triggerCollectionSources(self):
+        for src in self.sources:
+            src.triggerCollection()
+        
+        self.inputAvailable()
+
     #called on input trigger (probably redraw needed) -- override
     def inputAvailable(self):
         pass
+    
+    #create a dialog for errors
+    def displayError(self, errMsg):
+        dialog = Gtk.Dialog()
+        dialog.add_buttons("Ok", 1)
+        dialog.vbox.pack_start(Gtk.Label("Output '%s' Raised an Error:\n%s" % (self.name, errMsg)), False, False, 0)
+        dialog.show_all()
+        dialog.run()
+        dialog.destroy()
 
 #A display for data output
 class Graph(Output):
@@ -166,8 +191,11 @@ class Graph(Output):
         super().__init__(name, remove_callback)
         self.sourceColors = []
 
-        self.addOption(DevOptionGUI("x-axis label", "string", self.updateXLabel, default="time"))
-        self.addOption(DevOptionGUI("y-axis label", "string", self.updateYLabel, default="volts"))
+        self.addOption(DevOptionGUI("x-axis label", "string", lambda _:self.graphInput(), default=""))
+        self.addOption(DevOptionGUI("y-axis label", "string", lambda _:self.graphInput(), default=""))
+
+        self.addOption(DevOptionGUI("x-axis unit", "string", lambda _:self.graphInput(), default="s"))
+        self.addOption(DevOptionGUI("y-axis unit", "string", lambda _:self.graphInput(), default="V"))
     
     
     def generateOutput(self):
@@ -189,26 +217,26 @@ class Graph(Output):
     #generate a list of all the channels currently in use, as well as options for each
     def generateSourcesComponent(self):
         grid = Gtk.Grid()
+        grid.set_row_spacing(6)
+        grid.set_column_spacing(6)
         grid.attach(Gtk.Label("Source Name"), 0, 0, 1, 1)
         grid.attach(Gtk.Label("Color"), 1, 0, 1, 1)
         
         i = 1
         for src in self.sources:
-            grid.attach(Gtk.HSeparator(), 0, i, 2, 1)
-            i+=1
             grid.attach(Gtk.Label(src.parent.name + ": " + src.name), 0, i, 1, 1)
 
             colorButton = Gtk.ColorButton()
             color = None
-            if len(self.sourceColors) <= int((i/2)-1):
+            if len(self.sourceColors) <= i-1:
                 color = Gdk.RGBA(np.random.random_sample(), np.random.random_sample(), np.random.random_sample())
                 self.sourceColors.append([color.red, color.green, color.blue])
             else:
-                colorList = self.sourceColors[int((i/2)-1)]
+                colorList = self.sourceColors[i-1]
                 color = Gdk.RGBA(colorList[0], colorList[1], colorList[2])
             colorButton.set_rgba(color)
 
-            colorButton.connect("color-set", self.setSourceColor, int((i/2)-1))
+            colorButton.connect("color-set", self.setSourceColor, i-1)
 
             grid.attach(colorButton, 1, i, 1, 1)
 
@@ -229,40 +257,53 @@ class Graph(Output):
         self.regenateOutput()
 
     def inputAvailable(self):
-        xLabel = self.options.getStateByLabel("x-axis label")
-        yLabel = self.options.getStateByLabel("y-axis label")
-        self.graphInput(xLabel, yLabel)
-        
-    def updateXLabel(self, label):
-        xLabel = label
-        yLabel = self.options.getStateByLabel("y-axis label")
-        self.graphInput(xLabel, yLabel)
-    
-    def updateYLabel(self, label):
-        yLabel = label
-        xLabel = self.options.getStateByLabel("x-axis label")
-        self.graphInput(xLabel, yLabel)
+        self.graphInput()
 
-    def graphInput(self, xLabel, yLabel):
+    def graphInput(self):
+        xUnitName = self.options.getStateByLabel("x-axis unit")
+        yUnitName = self.options.getStateByLabel("y-axis unit")
+        if xUnitName == None:
+            return
+
+        #make sure units can be converted to an astropy unit
+        xUnit, yUnit = None, None
+        try:
+            xUnit = u.Unit(xUnitName)
+        except:
+            self.displayError("%s is not a valid unit name" % xUnitName)
+            return
+        
+        try:
+            yUnit = u.Unit(yUnitName)
+        except:
+            self.displayError("%s is not a valid unit name" % yUnitName)
+            return
+
+        xLabel = self.options.getStateByLabel("x-axis label")
+        yLabel = self.options.getStateByLabel("y-axis label")
         self.subplot.clear()
-        self.subplot.set_xlabel(xLabel)
-        self.subplot.set_ylabel(yLabel)
+        self.subplot.set_xlabel("%s (%s)" % (xLabel, xUnitName))
+        self.subplot.set_ylabel("%s (%s)" % (yLabel, yUnitName))
         self.subplot.grid(True)
         i=0
         for src in self.sources:
             xData = None
             yData = None
             try:
-                xData = src.getData().sel(x=xLabel).data
-                yData = src.getData().sel(x=yLabel).data
+                xData = src.getData()[src.getXAxisDim()].data * src.getData().units[src.getXAxisDim()]
+                yData = src.getData().data * src.getData().units['']
+                #convert units (they get stripped when matplotlib graphs them)
+                xData = xData.to(xUnit)
+                yData = yData.to(yUnit)
             except:
                 #the specified labels aren't present in the data
                 #TODO: warning?
                 i+=1
                 continue
             self.subplot.plot(xData, yData, color=self.sourceColors[i])
-            self.canvas.draw()
-            self.output_box.show_all()
             i+=1
+        
+        self.canvas.draw()
+        self.output_box.show_all()
 
     

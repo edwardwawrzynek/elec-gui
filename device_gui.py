@@ -97,9 +97,14 @@ class ChannelGUI:
     def collectData(self):
         raise Exception("Devices need to override collectData")
     
-    #return the x dimension label
+    #return the x dimension label to use
     def getXAxisDim(self):
         raise Exception("Devices need to override getXAxisDim")
+    
+    #return additional dimensions that will need to be selected
+    def getAdditionalDims(self):
+        #for 2d arrays overtime, where t is xAxisDim, something like ['row', 'col']
+        return []
 
     def triggerCollection(self):
         self.data = self.collectData()

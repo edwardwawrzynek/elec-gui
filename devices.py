@@ -1,4 +1,5 @@
 from test_dev import *
+from bh_test import *
 
 #manages all of the devices, as well as handling triggers
 #note: devices should be added through DeviceWindow, which handles rendering them
@@ -20,4 +21,4 @@ class Devices:
 
 
 devices = Devices([])
-devices_list = [TestDev("Test Dev 1"), TestDev("Test Dev 2")]
+devices_list = [TestDev("Test Dev 1"), TestDev("Test Dev 2"), BhTestDevice()]

@@ -155,9 +155,9 @@ class Output:
             return
 
         self.sources.append(source)
-        self.regenateOutput()
+        self.regenerateOutput()
     
-    def regenateOutput(self):
+    def regenerateOutput(self):
         #regenerate output component
         self.output_box.remove(self.output_box.get_children()[1])
         new_out = self.generateOutput()
@@ -189,7 +189,8 @@ class Output:
 class Graph(Output):
     def __init__(self, name, remove_callback):
         super().__init__(name, remove_callback)
-        self.sourceColors = []
+        #array of {'color', 'dimSelect'}
+        self.sourceOptions = []
 
         self.addOption(DevOptionGUI("x-axis label", "string", lambda _:self.graphInput(), default=""))
         self.addOption(DevOptionGUI("y-axis label", "string", lambda _:self.graphInput(), default=""))
@@ -223,38 +224,63 @@ class Graph(Output):
         grid.attach(Gtk.Label("Color"), 1, 0, 1, 1)
         
         i = 1
+        h = 1
         for src in self.sources:
-            grid.attach(Gtk.Label(src.parent.name + ": " + src.name), 0, i, 1, 1)
+            grid.attach(Gtk.Label(src.parent.name + ": " + src.name), 0, h, 1, 1)
 
+            #create a color selection button
             colorButton = Gtk.ColorButton()
             color = None
-            if len(self.sourceColors) <= i-1:
+            #check if this is a new source, or if we can reuse existing data
+            if len(self.sourceOptions) <= i-1:
+                #random color
                 color = Gdk.RGBA(np.random.random_sample(), np.random.random_sample(), np.random.random_sample())
-                self.sourceColors.append([color.red, color.green, color.blue])
+                #check if we need to do additional dimension selection options
+                dims = src.getAdditionalDims()
+                addDims=[]
+                for dim in dims:
+                    addDims.append({'name': dim, 'value': 0})
+                
+                self.sourceOptions.append({'color': [color.red, color.green, color.blue], 'dimSelect': addDims})
             else:
-                colorList = self.sourceColors[i-1]
+                colorList = self.sourceOptions[i-1]['color']
                 color = Gdk.RGBA(colorList[0], colorList[1], colorList[2])
             colorButton.set_rgba(color)
 
             colorButton.connect("color-set", self.setSourceColor, i-1)
 
-            grid.attach(colorButton, 1, i, 1, 1)
+            grid.attach(colorButton, 1, h, 1, 1)
 
             removeButton = Gtk.Button("Remove Source")
-            removeButton.connect("clicked", self.removeSource, int((i/2)-1))
-            grid.attach(removeButton, 2, i, 1, 1)
+            removeButton.connect("clicked", self.removeSource, i-1)
+            grid.attach(removeButton, 2, h, 1, 1)
+
+            #create button for dimensions
+            for dim in self.sourceOptions[i-1]["dimSelect"]:
+                h+=1
+                #generator needed to keep dim static for future callbacks
+                def genSetDim(dim):
+                    def setDim(val):
+                        dim['value']=val
+                    
+                    return setDim
+
+                entry = DevOptionGUI("%s: " % dim['name'], "int", genSetDim(dim), default=0, doTypeLabel=False)
+                grid.attach(entry.getComponent(), 1, h, 1, 1)
+
             i+=1
+            h+=1
         return grid
     
     def setSourceColor(self, widget, index):
         color = widget.get_rgba()
-        self.sourceColors[index] = [color.red, color.green, color.blue]
+        self.sourceOptions[index]['color'] = [color.red, color.green, color.blue]
         self.inputAvailable()
     
     def removeSource(self, widget, index):
         self.sources.pop(index)
-        self.sourceColors.pop(index)
-        self.regenateOutput()
+        self.sourceOptions.pop(index)
+        self.regenerateOutput()
 
     def inputAvailable(self):
         self.graphInput()
@@ -290,8 +316,12 @@ class Graph(Output):
             xData = None
             yData = None
             try:
+                ySels = {}
+                for dim in self.sourceOptions[i]['dimSelect']:
+                    ySels[dim['name']] = dim['value']
+                
                 xData = src.getData()[src.getXAxisDim()].data * src.getData().units[src.getXAxisDim()]
-                yData = src.getData().data * src.getData().units['']
+                yData = src.getData().sel(ySels).data * src.getData().units['']
                 #convert units (they get stripped when matplotlib graphs them)
                 xData = xData.to(xUnit)
                 yData = yData.to(yUnit)
@@ -300,7 +330,7 @@ class Graph(Output):
                 #TODO: warning?
                 i+=1
                 continue
-            self.subplot.plot(xData, yData, color=self.sourceColors[i])
+            self.subplot.plot(xData, yData, color=self.sourceOptions[i]['color'])
             i+=1
         
         self.canvas.draw()

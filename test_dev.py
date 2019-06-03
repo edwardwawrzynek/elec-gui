@@ -1,4 +1,4 @@
-import re, gi
+import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 
@@ -43,7 +43,7 @@ class TestDev(DeviceGUI):
         self.addOption(DevOptionGUI("random float", "float", lambda x:x))
         self.addOption(DevOptionGUI("random bool option", "bool", lambda x:x, default=True))
         self.addOption(DevOptionGUI("random button", "button", lambda x:x))
-        self.addOption(DevOptionGUI("random int", "int", lambda x:print(x), default=-5))
+        self.addOption(DevOptionGUI("random int", "int", lambda x:x, default=-5))
         #Add ten channels
         for i in range(10):
             self.addChannel(TestChannel(self, "channel %i" % i))

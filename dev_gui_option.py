@@ -7,9 +7,12 @@ class DevOptionGUI:
     #label is the name of the option
     #optionType is one of "string", "bool", "float", (TODO: channel, int, file, etc)
     #callback is the function to call when the value changes
-    def __init__(self, label, optionType, callback, default=None):
+    def __init__(self, label, optionType, callback, default=None, doTypeLabel=True):
         self.label = label
-        self.labelText = "%s (%s)" % (label, optionType)
+        if doTypeLabel:
+            self.labelText = "%s (%s)" % (label, optionType)
+        else:
+            self.labelText = label
         self.optionType = optionType
         self.callback = callback
         self.default = default

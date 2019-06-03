@@ -43,10 +43,10 @@ class BhTestChannelRealScalarTime(ChannelGUI):
         data = np.random.rand(samp_depth) * (max_val-min_val) + min_val
         t = np.arange(0, samp_depth/fs, 1/fs)
 
-        return xr.DataArray(data, dims=('t'), coords={'t': t})
+        return xr.DataArray(data, dims=('t'), coords={'t': t}, attrs={'units':{'t':u.s, '':u.V}})
 
     def getXAxisDim(self):
-        pass
+        return 't'
 
 
 class BhTestChannelRealScalarFreq(ChannelGUI):
@@ -88,10 +88,10 @@ class BhTestChannelRealScalarFreq(ChannelGUI):
         data = np.random.rand(steps) * (max_val-min_val) + min_val
         f = np.linspace(fstart, fstop, steps)
 
-        return xr.DataArray(data, dims=('f'), coords={'f': f})
+        return xr.DataArray(data, dims=('f'), coords={'f': f}, attrs={'units':{'f':u.Hz, '':u.V}})
 
     def getXAxisDim(self):
-        pass
+        return 'f'
 
 
 class BhTestChannelComplexScalarTime(ChannelGUI):

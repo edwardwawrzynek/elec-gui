@@ -192,19 +192,22 @@ class Graph(Output):
         #array of {'color', 'dimSelect'}
         self.sourceOptions = []
 
-        self.addOption(DevOptionGUI("x-axis label", "string", lambda _:self.graphInput(), default=""))
-        self.addOption(DevOptionGUI("y-axis label", "string", lambda _:self.graphInput(), default=""))
-
         self.addOption(DevOptionGUI("x-axis unit", "string", lambda _:self.graphInput(), default="s"))
         self.addOption(DevOptionGUI("y-axis unit", "string", lambda _:self.graphInput(), default="V"))
+        self.addOption(DevOptionGUI("second y-axis unit", "string", lambda _: self.graphInput(), default=""))
+
+        self.addOption(DevOptionGUI("x-axis label", "string", lambda _:self.graphInput(), default=""))
+        self.addOption(DevOptionGUI("y-axis label", "string", lambda _:self.graphInput(), default=""))
     
     
     def generateOutput(self):
         self.graph_vbox = Gtk.VBox()
         self.fig = Figure(figsize=(5, 4), dpi=100)
         self.subplot = self.fig.add_subplot(1, 1, 1)
+        self.subplot2 = self.subplot.twinx()
+        self.subplot2.set_visible(False)
         self.canvas = FigureCanvas(self.fig)
-        self.canvas.set_size_request(600, 400)
+        self.canvas.set_size_request(600, 600)
         self.toolbar = NavigationToolbar(self.canvas, self.graph_vbox)
         self.graph_vbox.pack_start(self.canvas, True, True, 0)
         self.graph_vbox.pack_start(self.toolbar, False, False, 0)
@@ -262,6 +265,7 @@ class Graph(Output):
                 def genSetDim(dim):
                     def setDim(val):
                         dim['value']=val
+                        self.inputAvailable()
                     
                     return setDim
 
@@ -286,8 +290,10 @@ class Graph(Output):
         self.graphInput()
 
     def graphInput(self):
+        lines = []
         xUnitName = self.options.getStateByLabel("x-axis unit")
         yUnitName = self.options.getStateByLabel("y-axis unit")
+        yUnit2Name = self.options.getStateByLabel("second y-axis unit")
         if xUnitName == None:
             return
 
@@ -304,35 +310,77 @@ class Graph(Output):
         except:
             self.displayError("%s is not a valid unit name" % yUnitName)
             return
+        
+        try:
+            yUnit2 = u.Unit(yUnit2Name)
+        except:
+            self.displayError("%s is not a valid unit name" % yUnit2Name)
+            return
+
 
         xLabel = self.options.getStateByLabel("x-axis label")
         yLabel = self.options.getStateByLabel("y-axis label")
         self.subplot.clear()
+        self.subplot2.clear()
+        self.subplot2.set_visible(False)
         self.subplot.set_xlabel("%s (%s)" % (xLabel, xUnitName))
         self.subplot.set_ylabel("%s (%s)" % (yLabel, yUnitName))
         self.subplot.grid(True)
         i=0
+
+        #the sources that actually got graphed on each axis (if only one, we color the axis that color)
+        subplot1i = []
+        subplot2i = []
         for src in self.sources:
+            finalYUnitName = yUnitName
             xData = None
             yData = None
+            subplot = self.subplot
             try:
                 ySels = {}
                 for dim in self.sourceOptions[i]['dimSelect']:
                     ySels[dim['name']] = dim['value']
                 
+                if src.getData() is None:
+                    i+=1
+                    continue
+
                 xData = src.getData()[src.getXAxisDim()].data * src.getData().units[src.getXAxisDim()]
                 yData = src.getData().sel(ySels).data * src.getData().units['']
+            except:
+                #specified labels aren't present
+                i+=1
+                continue
+            try:
                 #convert units (they get stripped when matplotlib graphs them)
                 xData = xData.to(xUnit)
                 yData = yData.to(yUnit)
-            except:
-                #the specified labels aren't present in the data
-                #TODO: warning?
-                i+=1
-                continue
-            self.subplot.plot(xData, yData, color=self.sourceOptions[i]['color'])
+                subplot1i.append(i)
+            except u.core.UnitConversionError:
+                #try second y-axis
+                try:
+                    xData = xData.to(xUnit)
+                    yData = yData.to(yUnit2)
+                    subplot = self.subplot2
+                    self.subplot2.set_ylabel("(%s)" % yUnit2Name)
+                    self.subplot2.set_visible(True)
+                    finalYUnitName = yUnit2Name
+                    subplot2i.append(i)
+                except u.core.UnitConversionError:
+                    #no unit on graph that we can graph this data with
+                    i+=1
+                    continue
+            lines += subplot.plot(xData, yData, color=self.sourceOptions[i]['color'], label=src.parent.name + ": " + src.name + " (" + finalYUnitName + ")")
             i+=1
-        
+        if len(subplot1i) == 1:
+            self.subplot.tick_params(axis='y', labelcolor=self.sourceOptions[subplot1i[0]]['color'])
+        else:
+            self.subplot.tick_params(axis='y', labelcolor='k')
+        if len(subplot2i) == 1:
+            self.subplot2.tick_params(axis='y', labelcolor=self.sourceOptions[subplot2i[0]]['color'])
+        else:
+            self.subplot2.tick_params(axis='y', labelcolor='k')
+        self.fig.legend(lines, [l.get_label() for l in lines])
         self.canvas.draw()
         self.output_box.show_all()
 

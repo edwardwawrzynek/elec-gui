@@ -81,7 +81,7 @@ class ChannelGUI:
         #options (channel specific)
         self.options = DevOptionGUIGroup([])
         #most recent data collection
-        self.data = xarray.DataArray([[]], dims=('x', 'y'))
+        self.data = None
         #device that owns the channel
         self.parent = dev
 

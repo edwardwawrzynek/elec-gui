@@ -139,11 +139,13 @@ class BhTestChannelComplexScalarTime(ChannelGUI):
         data = data_r + data_i * 1j
         t = np.arange(0, samp_depth/fs, 1/fs)
 
-        return xr.DataArray(data, dims=('t'), coords={'t': t})
+        return xr.DataArray(data, dims=('t'), coords={'t': t}, attrs={"units": {'':u.V, 't': u.s}})
 
     def getXAxisDim(self):
-        pass
-
+        return 't'
+    
+    def isComplex(self):
+        return True
 
 class BhTestChannelRealArrayTime(ChannelGUI):
 

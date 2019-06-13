@@ -105,6 +105,10 @@ class ChannelGUI:
     def getAdditionalDims(self):
         #for 2d arrays overtime, where t is xAxisDim, something like ['row', 'col']
         return []
+    
+    #return true if data returned is complex
+    def isComplex(self):
+        return False
 
     def triggerCollection(self):
         self.data = self.collectData()

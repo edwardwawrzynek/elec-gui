@@ -4,7 +4,7 @@ from gi.repository import Gtk
 
 from device_gui import DeviceGUI, ChannelGUI, DevOptionGUIGroup
 from devices import devices
-from graph import Graph
+from graph import Plot
 
 #The window showing the device subsytems (device selection, options, channel selection, options)
 class DeviceWindow:
@@ -51,7 +51,7 @@ class DeviceWindow:
 #outputs pane
 class OutputWindow:
     def __init__(self):
-        self.outputTypes = [Graph]
+        self.outputTypes = [Plot]
         self.outputs = []
         #contains outputs
         self.outputBox = Gtk.VBox()

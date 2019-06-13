@@ -62,6 +62,13 @@ def ChannelChooser(callback):
     
     return box
 
+def displayError(errMsg):
+    dialog = Gtk.Dialog()
+    dialog.add_buttons("Ok", 1)
+    dialog.vbox.pack_start(Gtk.Label("Error:\n%s" % errMsg), False, False, 0)
+    dialog.show_all()
+    dialog.run()
+    dialog.destroy()
 
 #Generic data output class (graph, raw values, data analyzer, etc)
 class Output:
@@ -185,8 +192,359 @@ class Output:
         dialog.run()
         dialog.destroy()
 
+#Represents an axis on the graph
+class PlotAxis:
+    def __init__(self, name, unit, min_val, max_val):
+        self.name = name
+        self.unit = unit
+        self.min_val = min_val
+        self.max_val = max_val
+        self.update_callback = lambda: None
+    
+    def setUpdateCallback(self, callback):
+        self.update_callback = callback
+
+    def setName(self, name):
+        self.name = name
+        self.update_callback()
+    
+    def setUnit(self, unit):
+        try:
+            self.unit = u.Unit(unit)
+            self.update_callback()
+        except:
+            displayError("unit %s is invalid" % unit)
+    
+    def setMin(self, minv):
+        self.min_val = minv
+        self.update_callback()
+    
+    def setMax(self, maxv):
+        self.max_val = maxv
+        self.update_callback()
+
+    #add an entry for axis input grid
+    def addToGrid(self, grid, v_index, remove_callback):
+        name_e = DevOptionGUI("", "string", self.setName, default=self.name, doLabel=False)
+        grid.attach(name_e.getComponent(), 0, v_index, 1, 1)
+        unit_e = DevOptionGUI("", "string", self.setUnit, default=str(self.unit), doLabel=False)
+        grid.attach(unit_e.getComponent(), 1, v_index, 1, 1)
+        mix_e = DevOptionGUI("", "float", self.setMin, default="", doLabel=False)
+        max_e = DevOptionGUI("", "float", self.setMax, default="", doLabel=False)
+        grid.attach(mix_e.getComponent(), 2, v_index, 1, 1)
+        grid.attach(max_e.getComponent(), 3, v_index, 1, 1)
+        remove_b = Gtk.Button("Remove Axis")
+        remove_b.connect("clicked", lambda _:remove_callback())
+        grid.attach(remove_b, 4, v_index, 1, 1)
+    
+    @staticmethod
+    def makeAxesMenu(axes, remove_callback, add_callback):
+        grid = Gtk.Grid()
+        grid.set_row_spacing(6)
+        grid.set_column_spacing(6)
+
+        grid.attach(Gtk.Label("Axis Name"), 0, 0, 1, 1)
+        grid.attach(Gtk.Label("Unit"), 1, 0, 1, 1)
+        grid.attach(Gtk.Label("Min Value"), 2, 0, 1, 1)
+        grid.attach(Gtk.Label("Max Value"), 3, 0, 1, 1)
+        grid.attach(Gtk.Label("Remove"), 4, 0, 1, 1)
+
+        v_index = 1
+        for a in axes:
+            def makeRemoveCallback(v_index):
+                return lambda: remove_callback(v_index-1)
+
+            a.addToGrid(grid, v_index, makeRemoveCallback(v_index))
+            v_index += 1
+        
+        add_b = Gtk.Button("Add New Y Axis")
+        add_b.connect("clicked", lambda _: add_callback())
+        grid.attach(add_b, 0, v_index, 5, 1)
+        
+        return grid
+
+class ComplexSelectionType:
+    NONE = -1
+    REAL = 0
+    IMAGINARY = 1
+    ANGLE_RAD = 2
+    ANGLE_DEG = 3
+    MAG = 4
+
+#represents a source for a plot and options for it
+class PlotSource:
+    def __init__(self, channel, y_axes):
+        self.channel = channel
+        self.color = Gdk.RGBA(np.random.random_sample(), np.random.random_sample(), np.random.random_sample())
+        self.dimSelect = {}
+        self.complexMode = ComplexSelectionType.NONE
+
+        self.y_axis = None
+        self.y_axes = y_axes
+    
+    def setYAxes(self, y_axes):
+        self.y_axes = y_axes
+    
+    def axisSelected(self, widget):
+        index = widget.get_active()
+        self.y_axis = self.y_axes[index]
+    
+    def setColor(self, widget):
+        self.color = widget.get_rgba()
+
+    def addToGrid(self, grid, v_index, remove_callback):
+        grid.attach(Gtk.Label(self.channel.parent.name + ": " + self.channel.name), 0, v_index, 1, 1)
+
+        y_axes_sel = Gtk.ComboBoxText()
+        for axis in self.y_axes:
+            y_axes_sel.append_text("%s [%s]" % (axis.name, str(axis.unit)))
+        
+        y_axes_sel.connect("changed", self.axisSelected)
+
+        #check if our previous selection is in menu, and, if so, select it
+        #else, choose axis 0
+        if self.y_axis in self.y_axes:
+            index = self.y_axes.index(self.y_axis)
+            y_axes_sel.set_active(index)
+        else:
+            self.y_axis = self.y_axes[0]
+            y_axes_sel.set_active(0)
+
+        grid.attach(y_axes_sel, 1, v_index, 1, 1)
+
+        color_b = Gtk.ColorButton()
+        color_b.set_rgba(self.color)
+        color_b.connect("color-set", self.setColor)
+        grid.attach(color_b, 2, v_index, 1, 1)
+
+        remove_b = Gtk.Button("Remove Source")
+        remove_b.connect("clicked", lambda _:remove_callback())
+        grid.attach(remove_b, 3, v_index, 1, 1)
+
+        #now add attributes based on channel type
+        h_index = 4
+        if self.channel.isComplex():
+            type_sel = Gtk.ComboBoxText()
+            type_sel.append_text("Real Part")
+            type_sel.append_text("Imaginary Part")
+            type_sel.append_text("Angle (radians)")
+            type_sel.append_text("Angle (degrees)")
+            type_sel.append_text("Magnitude")
+
+            if self.complexMode != -1:
+                type_sel.set_active(self.complexMode)
+
+            def setComplexType(widget):
+                self.complexMode = widget.get_active()
+
+            type_sel.connect("changed", setComplexType)
+
+            grid.attach(type_sel, h_index, v_index, 1, 1)
+            v_index+=1
+    
+    def getData(self):
+        #read data and add units
+        xData = self.channel.getData()[self.channel.getXAxisDim()].data * self.channel.getData().units[self.channel.getXAxisDim()]
+        yData = self.channel.getData().data * self.channel.getData().units['']
+
+        if self.complexMode != ComplexSelectionType.NONE:
+            if self.complexMode == ComplexSelectionType.REAL:
+                yData = yData.real
+            elif self.complexMode == ComplexSelectionType.IMAGINARY:
+                yData = yData.imag
+            elif self.complexMode == ComplexSelectionType.ANGLE_RAD:
+                yData = xr.ufuncs.angle(yData)
+            elif self.complexMode == ComplexSelectionType.ANGLE_DEG:
+                #manual unit correction required
+                yData = xr.ufuncs.angle(yData, deg=True) * (u.deg / u.rad)
+            elif self.complexMode == ComplexSelectionType.MAG:
+                yData = np.absolute(yData)
+
+        return xData, yData
+            
+
+    @staticmethod
+    def makeSourceMenu(sources, remove_callback):
+        grid = Gtk.Grid()
+        grid.set_row_spacing(6)
+        grid.set_column_spacing(6)
+
+        grid.attach(Gtk.Label("Name"), 0, 0, 1, 1)
+        grid.attach(Gtk.Label("Y-Axis"), 1, 0, 1, 1)
+        grid.attach(Gtk.Label("Color"), 2, 0, 1, 1)
+        grid.attach(Gtk.Label("Remove"), 3, 0, 1, 1)
+        v_index = 1
+        for src in sources:
+            
+            def makeRemoveCallback(v_index):
+                return lambda: remove_callback(v_index-1)
+
+            src.addToGrid(grid, v_index, makeRemoveCallback(v_index))
+            v_index+=1
+        
+        return grid
+        
+
+def makePlot(x_axis, y_axes, axis_update_callback):
+    if len(y_axes) < 1:
+        raise Exception("Plot needs at least one y-axis")
+    fig = Figure(figsize=(5, 4), dpi=100)
+    subplot = fig.add_subplot(1, 1, 1)
+
+    #we need to adjust the plot so that we have enough space for extra labels
+    if len(y_axes) > 2:
+        fig.subplots_adjust(right=0.75)
+    #generate all axes
+    subplots = [subplot]
+    for axis in y_axes[1:]:
+        subplots.append(subplot.twinx())
+    
+    #set labels, etc
+    i = -1
+    for axis, plot in zip(y_axes, subplots):
+        axis.setUpdateCallback(axis_update_callback)
+        plot.set_ylabel("%s [%s]" % (axis.name, str(axis.unit)))
+        if axis.min_val is None and axis.max_val is None:
+            plot.set_ylim(auto=True)
+        else:
+            plot.set_ylim(axis.min_val, axis.max_val)
+        if i>=0:
+            plot.spines['right'].set_position(('outward', i*50))
+        i+=1
+    
+    subplot.set_xlabel("%s [%s]" % (x_axis.name, str(x_axis.unit)))
+    if x_axis.min_val is None and x_axis.max_val is None:
+        subplot.set_xlim(auto=True)
+    else:
+        subplot.set_xlim(x_axis.min_val, x_axis.max_val)
+    subplot.grid(True)
+    
+    canvas = FigureCanvas(fig)
+    canvas.set_size_request(600, 600)
+    box = Gtk.VBox()
+    toolbar = NavigationToolbar(canvas, box)
+
+    box.pack_start(canvas, False, False, 0)
+    box.pack_start(toolbar, False, False, 0)
+
+    return box, canvas, subplots
+
+
+class Plot(Output):
+    def __init__(self, name, remove_callback):
+        self.y_axes = [PlotAxis("y-axis", u.V, None, None)]
+        self.x_axis = PlotAxis("x-axis", u.s, None, None)
+
+        self.box = Gtk.VBox()
+        self.plotSources = []
+
+        super().__init__(name, remove_callback)
+
+
+    def newAxis(self):
+        axis = PlotAxis("axis name", u.V, None, None)
+        self.y_axes.append(axis)
+
+        self.regenerateAxisMenu()
+        self.regenerateOutput()
+        self.updateSourceYAxes()
+    
+    def removeAxis(self, index):
+        self.y_axes.pop(index)
+
+        self.regenerateAxisMenu()
+        self.regenerateOutput()
+        self.updateSourceYAxes()
+    
+    def removeSource(self, index):
+        self.plotSources.pop(index)
+        self.sources.pop(index)
+
+        self.regenerateOutput()
+        self.regenerateSourceMenu()
+    
+    def updateSourceYAxes(self):
+        for src in self.plotSources:
+            src.setYAxes(self.y_axes)
+        
+        self.regenerateSourceMenu()
+
+    def generateOutput(self):
+        i = len(self.box.get_children())
+
+        self.graph_vbox, self.canvas, self.subplots = makePlot(self.x_axis, self.y_axes, lambda: [self.regenerateOutput(), self.regenerateSourceMenu()])
+        self.box.pack_start(self.graph_vbox, False, False, 0)
+        self.box.pack_start(Gtk.Label("Y-axes"), False, False, 6)
+        self.box.pack_start(PlotAxis.makeAxesMenu(self.y_axes, self.removeAxis, self.newAxis), False, False, 0)
+        self.box.pack_start(Gtk.Label("X-Axis"), False, False, 6)
+        grid = Gtk.Grid()
+        self.x_axis.addToGrid(grid, 0, lambda _:None)
+        self.x_axis.setUpdateCallback(self.regenerateOutput)
+        self.box.pack_start(grid, False, False, 0)
+
+        self.box.pack_start(PlotSource.makeSourceMenu(self.plotSources, self.removeSource), False, False, 0)
+        return self.box
+    
+    def regenerateOutput(self):
+        self.box.remove(self.box.get_children()[0])
+        self.graph_vbox, self.canvas, self.subplots = makePlot(self.x_axis, self.y_axes, lambda: [self.regenerateOutput(), self.regenerateSourceMenu()])
+
+        self.box.pack_start(self.graph_vbox, False, False, 0)
+        self.box.reorder_child(self.graph_vbox, 0)
+
+        self.canvas.draw()
+        self.box.show_all()
+    
+    def regenerateAxisMenu(self):
+        self.box.remove(self.box.get_children()[2])
+        menu = PlotAxis.makeAxesMenu(self.y_axes, self.removeAxis, self.newAxis)
+        self.box.pack_start(menu, False, False, 0)
+        self.box.reorder_child(menu, 2)
+
+        self.box.show_all()
+    
+    def regenerateSourceMenu(self):
+        self.box.remove(self.box.get_children()[5])
+        menu = PlotSource.makeSourceMenu(self.plotSources, self.removeSource)
+        self.box.pack_start(menu, False, False, 0)
+        self.box.reorder_child(menu, 5)
+
+        self.box.show_all()
+
+    #hook when adding source
+    def checkSource(self, source):
+        self.plotSources.append(PlotSource(source, self.y_axes))
+        self.regenerateSourceMenu()
+
+    def inputAvailable(self):
+        self.graphInputs()
+        self.canvas.draw()
+        self.box.show_all()
+    
+    def graphInputs(self):
+        for plt in self.subplots:
+            plt.lines = []
+        for src in self.plotSources:
+            if src.y_axis is None:
+                continue
+            if src.channel.getData() is None:
+                continue
+            #find which subplot to plot on based on axis selection
+            subplot = self.subplots[self.y_axes.index(src.y_axis)]
+            
+            #getData through plotSource (allows it to do needed conversions)
+            xData, yData = src.getData()
+            
+            #do unit conversion
+            try:
+                xData = xData.to(self.x_axis.unit)
+                yData = yData.to(src.y_axis.unit)
+            except:
+                continue
+            subplot.plot(xData, yData, color=[src.color.red, src.color.green, src.color.blue])
+'''
 #A display for data output
-class Graph(Output):
+class Plot(Output):
     def __init__(self, name, remove_callback):
         super().__init__(name, remove_callback)
         #array of {'color', 'dimSelect'}
@@ -323,8 +681,8 @@ class Graph(Output):
         self.subplot.clear()
         self.subplot2.clear()
         self.subplot2.set_visible(False)
-        self.subplot.set_xlabel("%s (%s)" % (xLabel, xUnitName))
-        self.subplot.set_ylabel("%s (%s)" % (yLabel, yUnitName))
+        self.subplot.set_xlabel("%s [%s]" % (xLabel, xUnitName))
+        self.subplot.set_ylabel("%s [%s]" % (yLabel, yUnitName))
         self.subplot.grid(True)
         i=0
 
@@ -383,5 +741,4 @@ class Graph(Output):
         self.fig.legend(lines, [l.get_label() for l in lines])
         self.canvas.draw()
         self.output_box.show_all()
-
-    
+'''    

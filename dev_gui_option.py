@@ -7,8 +7,9 @@ class DevOptionGUI:
     #label is the name of the option
     #optionType is one of "string", "bool", "float", (TODO: channel, int, file, etc)
     #callback is the function to call when the value changes
-    def __init__(self, label, optionType, callback, default=None, doTypeLabel=True):
+    def __init__(self, label, optionType, callback, default=None, doTypeLabel=True, doLabel=True):
         self.label = label
+        self.doLabel = doLabel
         if doTypeLabel:
             self.labelText = "%s (%s)" % (label, optionType)
         else:
@@ -22,7 +23,8 @@ class DevOptionGUI:
     def generateComponent(self):
         box = Gtk.HBox()
         label = Gtk.Label(self.labelText, halign=Gtk.Align.START)
-        box.pack_start(label, True, True, 0)
+        if self.doLabel:
+            box.pack_start(label, True, True, 0)
         self.comp = False
         state = None
         if self.default != None:
@@ -63,6 +65,9 @@ class DevOptionGUI:
 
             def float_entry_activate(widget, callback):
                 text = widget.get_text()
+                if text=="":
+                    callback(None)
+                    return
                 #make sure entry is a float, clear if not
                 match = re.match(r"-?(\d+(\.\d+)?)", text)
                 if match != None and match.group(0) == text:

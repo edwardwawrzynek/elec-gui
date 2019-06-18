@@ -116,19 +116,19 @@ class Output:
         #vbox with graph/whatever at top, then add source button, then type specific options
         self.output_box = Gtk.VBox()
         #add title and removal button
-        titleBox = Gtk.HBox()
-        titleBox.pack_start(Gtk.Label(self.name), True, True, 0)
+        self.titleBox = Gtk.HBox()
+        self.titleBox.pack_start(Gtk.Label(self.name), True, True, 0)
         
         triggerButton = Gtk.Button("Trigger Collection")
         triggerButton.connect("clicked", lambda _: self.triggerCollectionSources())
-        titleBox.pack_start(triggerButton, False, False, 0)
+        self.titleBox.pack_start(triggerButton, False, False, 0)
         
 
         removeButton = Gtk.Button("Remove Output")
         removeButton.connect("clicked", lambda _, data: self.remove_callback(data), self)
-        titleBox.pack_start(removeButton, False, False, 0)
+        self.titleBox.pack_start(removeButton, False, False, 0)
 
-        self.output_box.pack_start(titleBox, False, False, 0)
+        self.output_box.pack_start(self.titleBox, False, False, 0)
         #add overridden component
         self.output_box.pack_start(self.generateOutput(), False, False, 0)
 
@@ -413,11 +413,18 @@ class PlotSource:
         return grid
         
 
-def makePlot(x_axis, y_axes, axis_update_callback):
+def makePlot(x_axis, y_axes, axis_update_callback, is_polar):
     if len(y_axes) < 1:
         raise Exception("Plot needs at least one y-axis")
+    if is_polar and len(y_axes) != 1:
+        displayError("Polar plots can't have more than one y-axis")
+        y_axes = [y_axes[0]]
     fig = Figure(figsize=(5, 4), dpi=100)
-    subplot = fig.add_subplot(1, 1, 1)
+    subplot = None
+    if is_polar:
+        subplot = fig.add_subplot(1, 1, 1, projection='polar')
+    else:
+        subplot = fig.add_subplot(1, 1, 1)
 
     #we need to adjust the plot so that we have enough space for extra labels
     if len(y_axes) > 2:
@@ -431,7 +438,11 @@ def makePlot(x_axis, y_axes, axis_update_callback):
     i = -1
     for axis, plot in zip(y_axes, subplots):
         axis.setUpdateCallback(axis_update_callback)
-        plot.set_ylabel("%s [%s]" % (axis.name, str(axis.unit)))
+        if not is_polar:
+            plot.set_ylabel("%s [%s]" % (axis.name, str(axis.unit)))
+        else:
+            label_position=plot.get_rlabel_position()
+            plot.text(np.radians(label_position+10),plot.get_rmax()/2.0, "%s [%s]" % (axis.name, str(axis.unit)), rotation=label_position,ha='center',va='center')
         if axis.min_val is None and axis.max_val is None:
             plot.set_ylim(auto=True)
         else:
@@ -457,6 +468,9 @@ def makePlot(x_axis, y_axes, axis_update_callback):
 
     return box, canvas, subplots
 
+class PlotType:
+    CARTESIAN = 0
+    POLAR = 1
 
 class Plot(Output):
     def __init__(self, name, remove_callback):
@@ -465,6 +479,7 @@ class Plot(Output):
 
         self.box = Gtk.VBox()
         self.plotSources = []
+        self.plotType = PlotType.CARTESIAN
 
         super().__init__(name, remove_callback)
 
@@ -495,11 +510,11 @@ class Plot(Output):
             src.setYAxes(self.y_axes)
         
         self.regenerateSourceMenu()
-
+    
     def generateOutput(self):
         i = len(self.box.get_children())
 
-        self.graph_vbox, self.canvas, self.subplots = makePlot(self.x_axis, self.y_axes, lambda: [self.regenerateOutput(), self.regenerateSourceMenu()])
+        self.graph_vbox, self.canvas, self.subplots = makePlot(self.x_axis, self.y_axes, lambda: [self.regenerateOutput(), self.regenerateSourceMenu()], self.plotType == PlotType.POLAR)
         self.canvas.mpl_connect("motion_notify_event", self.handleMouseover)
         self.box.pack_start(self.graph_vbox, False, False, 0)
         self.value_trace = Gtk.Label("(Hover over plot to see trace of values)", halign=Gtk.Align.START)
@@ -508,16 +523,30 @@ class Plot(Output):
         self.box.pack_start(PlotAxis.makeAxesMenu(self.y_axes, self.removeAxis, self.newAxis), False, False, 0)
         self.box.pack_start(Gtk.Label("X-Axis"), False, False, 6)
         grid = Gtk.Grid()
+        grid.set_column_spacing(6)
+        grid.set_row_spacing(6)
         self.x_axis.addToGrid(grid, 0, lambda _:None)
         self.x_axis.setUpdateCallback(self.regenerateOutput)
         self.box.pack_start(grid, False, False, 0)
 
+        combo_box = Gtk.ComboBoxText()
+        combo_box.append_text("Cartesian Plot")
+        combo_box.append_text("Polar Plot")
+        combo_box.set_active(0)
+        combo_box.connect("changed", self.setType)
+        self.titleBox.pack_start(combo_box, False, False, 0)
+        self.titleBox.reorder_child(combo_box, 1)
+
         self.box.pack_start(PlotSource.makeSourceMenu(self.plotSources, self.removeSource), False, False, 0)
         return self.box
     
+    def setType(self, widget):
+        self.plotType = widget.get_active()
+        self.regenerateOutput()
+
     def regenerateOutput(self):
         self.box.remove(self.box.get_children()[0])
-        self.graph_vbox, self.canvas, self.subplots = makePlot(self.x_axis, self.y_axes, lambda: [self.regenerateOutput(), self.regenerateSourceMenu()])
+        self.graph_vbox, self.canvas, self.subplots = makePlot(self.x_axis, self.y_axes, lambda: [self.regenerateOutput(), self.regenerateSourceMenu()], self.plotType == PlotType.POLAR)
         self.canvas.mpl_connect("motion_notify_event", self.handleMouseover)
 
         self.box.pack_start(self.graph_vbox, False, False, 0)
@@ -551,6 +580,10 @@ class Plot(Output):
         self.graphInput()
     
     def graphInput(self):
+        #keep track of number of sources using each y-axis
+        source_axis_usage = []
+        for _ in self.subplots:
+            source_axis_usage.append([])
         for plt in self.subplots:
             plt.lines = []
         for src in self.plotSources:
@@ -570,8 +603,18 @@ class Plot(Output):
                 yData = yData.to(src.y_axis.unit)
             except:
                 continue
-            
+
+            i = self.y_axes.index(src.y_axis)
+            source_axis_usage[i].append(src)
+
             subplot.plot(xData, yData, color=[src.color.red, src.color.green, src.color.blue])
+        
+        for plot, i in zip(self.subplots, range(len(self.subplots))):
+            if len(source_axis_usage[i]) == 1:
+                src = source_axis_usage[i][0]
+                plot.yaxis.label.set_color([src.color.red, src.color.green, src.color.blue])
+            else:
+                plot.yaxis.label.set_color('k')
         
         self.canvas.draw()
         self.box.show_all()

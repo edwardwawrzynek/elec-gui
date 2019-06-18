@@ -17,6 +17,7 @@ class TestChannel(ChannelGUI):
         self.addOption(DevOptionGUI("max", "float", lambda x:x, default=1.0))
         self.addOption(DevOptionGUI("min", "float", lambda x:x, default=0.0))
         self.addOption(DevOptionGUI("unit", "string", lambda x:x, default="V"))
+        self.addOption(DevOptionGUI("x unit", "string", lambda x:x, default="s"))
     
     def collectData(self):
         #return random data
@@ -27,7 +28,7 @@ class TestChannel(ChannelGUI):
             np.random.rand(100)*(maxV-minV)+minV, 
             dims=('t'), 
             coords={'t':np.arange(0.0, 10.0, 0.1)},
-            attrs={'units':{'':units.Unit(self.options.getStateByLabel("unit")), 't':units.s}})
+            attrs={'units':{'':units.Unit(self.options.getStateByLabel("unit")), 't':units.Unit(self.options.getStateByLabel("x unit"))}})
 
     def getXAxisDim(self):
         return 't'

@@ -448,7 +448,7 @@ def makePlot(x_axis, y_axes, axis_update_callback, is_polar):
         else:
             plot.set_ylim(axis.min_val, axis.max_val)
         if i>=0:
-            plot.spines['right'].set_position(('outward', i*50))
+            plot.spines['right'].set_position(('outward', i*60))
         i+=1
     
     subplot.set_xlabel("%s [%s]" % (x_axis.name, str(x_axis.unit)))
@@ -580,6 +580,7 @@ class Plot(Output):
         self.graphInput()
     
     def graphInput(self):
+        lines = []
         #keep track of number of sources using each y-axis
         source_axis_usage = []
         for _ in self.subplots:
@@ -607,8 +608,13 @@ class Plot(Output):
             i = self.y_axes.index(src.y_axis)
             source_axis_usage[i].append(src)
 
-            subplot.plot(xData, yData, color=[src.color.red, src.color.green, src.color.blue])
+            lines += subplot.plot(xData, yData, color=[src.color.red, src.color.green, src.color.blue], label=src.channel.parent.name + ": " + src.channel.name)
         
+        if not self.subplots[0].get_legend() is None:
+            self.subplots[0].get_legend().remove()
+        
+        self.subplots[0].legend(lines, [l.get_label() for l in lines], loc='upper right')
+
         for plot, i in zip(self.subplots, range(len(self.subplots))):
             if len(source_axis_usage[i]) == 1:
                 src = source_axis_usage[i][0]
